@@ -41,7 +41,6 @@ local success, err = pcall(function()
     local DEFAULT_SPEED = 16
     local DEFAULT_JUMP = 50
     local DEFAULT_GRAVITY = 196.2
-    local DEFAULT_FOV = 70
     
     -- Состояния функций
     local antiSitEnabled = false
@@ -117,18 +116,6 @@ local success, err = pcall(function()
                     obj.Transparency = value
                 end
             end
-        end
-    end
-
-    local function ToggleInvisible()
-        isInvisible = not isInvisible
-        if isInvisible then
-            pcall(function()
-                loadstring(game:HttpGet('https://pastebin.com/raw/3Rnd9rHf'))()
-            end)
-        else
-            local char = LocalPlayer.Character
-            if char then UpdateCharacterTransparency(char, 0) end
         end
     end
 
@@ -647,7 +634,6 @@ local success, err = pcall(function()
         SupportTextLabel.Text = data.NothingHere
         GameSelectLabel.Text = data.SelectGameText
         
-        DevsTitleLabel = DevsLabel
         DevsLabel.Text = data.DevsTitle
         DevsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         DevsLabel.Font = Enum.Font.SourceSansBold
@@ -692,7 +678,6 @@ local success, err = pcall(function()
     DevelopersBlock.Name = "DevelopersBlock"
     DevelopersBlock.Size = UDim2.new(1, 0, 0, 145) 
     DevelopersBlock.BackgroundTransparency = 1
-    DevelopersBlock.Parent = GreyFrame
     DevelopersBlock.ZIndex = 3
 
     local SeparatorLine4Left = Instance.new("Frame", DevelopersBlock)
@@ -725,33 +710,29 @@ local success, err = pcall(function()
     DevsText.TextSize = 12
     DevsText.ZIndex = 5
 
-    -- КНОПКИ ЗАКРЫТИЯ И СВОРЫВАНИЯ (ИСПРАВЛЕННЫЙ БЛОК)
+    -- КНОПКИ ЗАКРЫТИЯ И СВОРЫВАНИЯ
     CloseBtn.Activated:Connect(function() ScreenGui:Destroy() end)
     
     MinimizeBtn.Activated:Connect(function()
         isMinimized = not isMinimized
         if isMinimized then
-            -- Превращаем меню в аккуратную, компактную плашку
             MainFrame.Size = UDim2.new(0, 160, 0, 44)
             SideTab.Visible = false
             GreyFrame.Visible = false
             SupportFrame.Visible = false
             GameFrame.Visible = false
             
-            -- Выравниваем элементы шапки под новый маленький размер фрейма
             Title.Text = "NexusHUB —"
             MinimizeBtn.Text = "+"
             MinimizeBtn.Position = UDim2.new(1, -50, 0, 5)
             CloseBtn.Position = UDim2.new(1, -24, 0, 5)
         else
-            -- Возвращаем всё в исходное рабочее состояние
             Title.Text = "NexusHUB"
             MinimizeBtn.Text = "—"
             MinimizeBtn.Position = UDim2.new(1, -55, 0, 5)
             CloseBtn.Position = UDim2.new(1, -28, 0, 5)
             
             SideTab.Visible = true
-            -- Показываем ту вкладку, которая была выбрана до сворачивания
             if currentTab == "Settings" then GreyFrame.Visible = true
             elseif currentTab == "Support" then SupportFrame.Visible = true
             elseif currentTab == "Game" then GameFrame.Visible = true
