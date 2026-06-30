@@ -45,6 +45,7 @@ local success, err = pcall(function()
     
     -- Состояния функций
     local antiSitEnabled = false
+    local antiAfkEnabled = false
     local infJumpEnabled = false
     local swimModeEnabled = false
     local noclipEnabled = false
@@ -60,10 +61,18 @@ local success, err = pcall(function()
     local singleEspEnabled = false
     local allEspEnabled = false
 
+    -- Состояния вкладки Килл
+    local selectedKillPlayer = nil
+    local selectedTpPlayer = nil
+    local selectedKillMethod = "Sofa (Диван)"
+    local killLoopActive = true
+    local flingLoopActive = true
+
     local Camera = Workspace.CurrentCamera
+    local startPosition = nil -- Для захвата диваном
 
     -------------------------------------------------------
-    -- ТАБЛИЦА ЛОКАЛИЗАЦИИ
+    -- ТАБЛИЦА ЛОКАЛИЗАЦИИ (РАСШИРЕННАЯ)
     -------------------------------------------------------
     local Localization = {
         ["English"] = {
@@ -71,7 +80,7 @@ local success, err = pcall(function()
             Interface = "Interface", Size = "Size", Length = "Length", Width = "Width",
             GamesTitle = "Games", DevsTitle = "Developers", Settings = "Settings",
             WalkSpeed = "WalkSpeed", JumpPower = "JumpPower", Gravity = "Gravity", ResetBtn = "Reset",
-            InvisibleText = "Invisible", ToolBtn = "Menu UI", AntiSit = "Anti-Sit",
+            InvisibleText = "Invisible", ToolBtn = "Menu UI", AntiSit = "Anti-Sit", AntiAFK = "Anti-AFK",
             PlayerTab = "Player", InfJump = "Infinite Jump", SwimMode = "Swim Mode",
             Noclip = "Noclip", GravZero = "Space Gravity", ShiftLock = "Shift Lock",
             AutoUnban = "Auto Unban", SitBtn = "Sit Menu", FlyBtn = "Fly Menu", SitAction = "Sit Now",
@@ -80,32 +89,48 @@ local success, err = pcall(function()
             T_Skin = "Skin", T_Car = "Car", T_House = "House", T_Music = "Music",
             T_Emotes = "Emotes", T_Troll = "Troll", T_Defense = "Defense", T_Server = "Server",
             FOVText = "Field of View", SelectPlrTitle = "Select Player", TeleportTo = "Teleport to Player",
-            SpectatePlr = "Spectate Player", FollowPlr = "Follow Player", EspPlr = "ESP Player", EspAll = "ESP All Players",
-            SignPlaceholder = "Sign text...", WriteBtn = "Write", GetTool = "Select (Tool)", SelectPlrHolder = "Select player..."
+            SpectatePlr = "Spectate Player", FollowPlr = "Follow Player: OFF", FollowPlrOn = "Follow Player: ON", 
+            EspPlr = "ESP Player", EspAll = "ESP All Players",
+            SignPlaceholder = "Sign text...", WriteBtn = "Write", GetTool = "Select (Tool)", 
+            SelectPlrHolder = "Select player...", SelectMethod = "Select kill method...",
+            FastKill = "Fast Kill (Tool)", AutoKillPlr = "Auto-Kill Target", AutoKillAll = "Auto-Kill All",
+            AutoManualKill = "Auto-Manual Kill", StopKills = "Stop Kills", FlingPlr = "Fling Target",
+            FlingAll = "Fling All Players", FlingDoors = "Fling Doors", StopFling = "Stop Fling",
+            AutoGetSofa = "Auto Get Sofa", GetRemoveSofa = "Get/Remove Sofa", SofaKidnap = "Sofa Kidnap To Start",
+            SelectLocHolder = "Select Brookhaven Location...", TeleportTitle = "Teleport",
+            TeleportToLoc = "Teleport to Location", TeleportToPlr = "Teleport to Player"
         },
         ["Русский"] = {
             LangLabel = "Язык", SelectGame = "Выбрать игру...", 
             Interface = "Интерфейс", Size = "Размер", Length = "Длина", Width = "Ширина",
             GamesTitle = "Игры", DevsTitle = "Разработчики", Settings = "Настройки",
             WalkSpeed = "Скорость бега", JumpPower = "Сила прыжка", Gravity = "Гравитация", ResetBtn = "Сброс",
-            InvisibleText = "Невидимость", ToolBtn = "Менюшка", AntiSit = "Анти-сидеть",
+            InvisibleText = "Невидимость", ToolBtn = "Менюшка", AntiSit = "Анти-сидеть", AntiAFK = "Анти-АФК",
             PlayerTab = "Игрок", InfJump = "Бесконечный прыжок", SwimMode = "Плавать",
             Noclip = "Ноклип", GravZero = "Космическая Гравитация", ShiftLock = "Блокировка Шифт",
             AutoUnban = "Авто Разбан (Дома)", SitBtn = "Сидеть", FlyBtn = "Летать", SitAction = "Нажмите, чтобы сесть",
             DevsText = "Дизайн: Won4sko\n\nКодинг: Won4sko\n\nФункции: Won4sko, Gemini, DeepSeek.",
             T_Players = "Игроки", T_Kill = "Килл", T_Teleport = "Телепорт", T_Items = "Предметы",
             T_Skin = "Скин", T_Car = "Машина", T_House = "Дом", T_Music = "Музыка",
-            T_Emotes = "Эмоции", T_Troll = "Тролл", T_Defense = "Защита", T_Server = "Сервер",
+            T_Emotes = "Эмоции", T_Troll = "Тролль", T_Defense = "Защита", T_Server = "Сервер",
             FOVText = "Поле зрения (FOV)", SelectPlrTitle = "Выбор игрока", TeleportTo = "Телепорт к игроку",
-            SpectatePlr = "Наблюдать за игроком", FollowPlr = "Следовать за игроком", EspPlr = "Подсветить игрока", EspAll = "Подсветить всех",
-            SignPlaceholder = "Текст таблички...", WriteBtn = "Написать", GetTool = "Выбрать (Tool)", SelectPlrHolder = "Выберите игрока..."
+            SpectatePlr = "Наблюдать за игроком", FollowPlr = "Следовать за игроком: ВЫКЛ", FollowPlrOn = "Следовать за игроком: ВКЛ",
+            EspPlr = "Подсветить игрока", EspAll = "Подсветить всех",
+            SignPlaceholder = "Текст таблички...", WriteBtn = "Написать", GetTool = "Выбрать (Tool)", 
+            SelectPlrHolder = "Выберите игрока...", SelectMethod = "Выберите способ килла...",
+            FastKill = "Быстрый килл (Tool)", AutoKillPlr = "АвтоКилл выбранного игрока", AutoKillAll = "АвтоКилл всех игроков",
+            AutoManualKill = "Авто ручной килл", StopKills = "Остановить киллы", FlingPlr = "Флинг выбранного игрока",
+            FlingAll = "Флинг всех игроков", FlingDoors = "Флинг дверей", StopFling = "Остановить флинг",
+            AutoGetSofa = "Авто получение дивана", GetRemoveSofa = "Получить/Удалить Диван", SofaKidnap = "Захват диваном на старт",
+            SelectLocHolder = "Выберите локацию Брукхейвена...", TeleportTitle = "Телепорт",
+            TeleportToLoc = "Телепорт к Локации", TeleportToPlr = "Телепорт к игроку"
         },
         ["العربية"] = {
             LangLabel = "اللغة", SelectGame = "اختر لعبة...", 
             Interface = "الواجهة", Size = "الحجم", Length = "الطول", Width = "العرض",
             GamesTitle = "الألعاب", DevsTitle = "المطورين", Settings = "الإعدادات",
             WalkSpeed = "سرعة المشي", JumpPower = "قوة القفز", Gravity = "الجاذبية", ResetBtn = "إعادة",
-            InvisibleText = "الاقتفاء", ToolBtn = "قائمة", AntiSit = "منع الجلوس",
+            InvisibleText = "اختفاء", ToolBtn = "قائمة", AntiSit = "منع الجلوس", AntiAFK = "ضد الأفلاق",
             PlayerTab = "لاعب", InfJump = "قفز لا نهائي", SwimMode = "وضع السباحة",
             Noclip = "اختراق الجدران", GravZero = "جاذبية الفضاء", ShiftLock = "قفل التحويل",
             AutoUnban = "إلغاء الحظر التلقائي", SitBtn = "جلوس", FlyBtn = "طيران", SitAction = "اضغط للجلوس",
@@ -115,24 +140,39 @@ local success, err = pcall(function()
             T_Emotes = "تعبيرات", T_Troll = "مقلب", T_Defense = "حماية", T_Server = "خادم",
             FOVText = "مجال الرؤية", SelectPlrTitle = "اختر لاعب", TeleportTo = "انتقال للاعب",
             SpectatePlr = "مراقبة اللاعب", FollowPlr = "اتبع اللاعب", EspPlr = "تحديد اللاعب", EspAll = "تحديد الكل",
-            SignPlaceholder = "نص اللوحة...", WriteBtn = "كتابة", GetTool = "اختر أداة", SelectPlrHolder = "اختر لاعب..."
+            SignPlaceholder = "نص اللوحة...", WriteBtn = "كتابة", GetTool = "اختر أداة", 
+            SelectPlrHolder = "اختر لاعب...", SelectMethod = "اختر طريقة القتل...",
+            FastKill = "قتل سريع (أداة)", AutoKillPlr = "قتل تلقائي للهدف", AutoKillAll = "قتل تلقائي للجميع",
+            AutoManualKill = "قتل يدوي تلقائي", StopKills = "إيقاف القتل", FlingPlr = "قذف الهدف",
+            FlingAll = "قذف جميع اللاعبين", FlingDoors = "قذف الأبواب", StopFling = "إيقاف القذف",
+            AutoGetSofa = "الحصول على أريكة تلقائي", GetRemoveSofa = "الحصول/إزالة الأريكة", SofaKidnap = "اختطاف بالأريكة",
+            SelectLocHolder = "اختر موقع بروكهافن...", TeleportTitle = "انتقال",
+            TeleportToLoc = "انتقال إلى الموقع", TeleportToPlr = "انتقال إلى اللاعب"
         },
         ["Español"] = {
             LangLabel = "Idioma", SelectGame = "Seleccionar juego...", 
             Interface = "Interfaz", Size = "Tamaño", Length = "Longitud", Width = "Ancho",
             GamesTitle = "Juegos", DevsTitle = "Devs", Settings = "Ajustes",
             WalkSpeed = "Velocidad", JumpPower = "Fuerza de Salto", Gravity = "Gravedad", ResetBtn = "Reiniciar",
-            InvisibleText = "Invisibilidad", ToolBtn = "Menú UI", AntiSit = "Anti-Asiento",
+            InvisibleText = "Invisibilidad", ToolBtn = "Menú UI", AntiSit = "Anti-Asiento", AntiAFK = "Anti-AFK",
             PlayerTab = "Jugador", InfJump = "Salto Infinito", SwimMode = "Modo Nadar",
-            Noclip = "Noclip", GravedadEspacial = "Gravedad Espacial", ShiftLock = "Shift Lock",
+            Noclip = "Noclip", GravZero = "Gravedad Espacial", ShiftLock = "Shift Lock",
             AutoUnban = "Auto Desbanear", SitBtn = "Sentarse", FlyBtn = "Volar", SitAction = "Haz clic para sentarte",
             DevsText = "Diseño: Won4sko\n\nCódigo: Won4sko\n\nFunciones: Won4sko, Gemini, DeepSeek.",
             T_Players = "Jugadores", T_Kill = "Kill", T_Teleport = "Teleport", T_Items = "Objetos",
             T_Skin = "Skin", T_Car = "Coche", T_House = "Casa", T_Music = "Música",
             T_Emotes = "Emociones", T_Troll = "Troll", T_Defense = "Defensa", T_Server = "Servidor",
             FOVText = "Campo de Visión", SelectPlrTitle = "Seleccionar Jugador", TeleportTo = "Teletransportarse al jugador",
-            SpectatePlr = "Espectar jugador", FollowPlr = "Seguir jugador", EspPlr = "Resaltar jugador", EspAll = "Resaltar a todos",
-            SignPlaceholder = "Texto del cartel...", WriteBtn = "Escribir", GetTool = "Obtener herramienta", SelectPlrHolder = "Seleccionar jugador..."
+            SpectatePlr = "Espectar jugador", FollowPlr = "Seguir jugador: OFF", FollowPlrOn = "Seguir jugador: ON",
+            EspPlr = "Resaltar jugador", EspAll = "Resaltar a todos",
+            SignPlaceholder = "Texto del cartel...", WriteBtn = "Escribir", GetTool = "Obtener herramienta",
+            SelectPlrHolder = "Seleccionar jugador...", SelectMethod = "Seleccionar método de kill...",
+            FastKill = "Kill rápido (Herramienta)", AutoKillPlr = "Auto-Kill objetivo", AutoKillAll = "Auto-Kill todos",
+            AutoManualKill = "Auto-Kill manual", StopKills = "Detener kills", FlingPlr = "Fling objetivo",
+            FlingAll = "Fling todos los jugadores", FlingDoors = "Fling puertas", StopFling = "Detener Fling",
+            AutoGetSofa = "Obtener sofá automático", GetRemoveSofa = "Obtener/Eliminar Sofá", SofaKidnap = "Secuestro con sofá",
+            SelectLocHolder = "Seleccionar ubicación de Brookhaven...", TeleportTitle = "Teletransporte",
+            TeleportToLoc = "Teletransportarse a Ubicación", TeleportToPlr = "Teletransportarse a Jugador"
         }
     }
 
@@ -162,55 +202,65 @@ local success, err = pcall(function()
         end
     end
 
+    -- Логика Анти-АФК
+    pcall(function()
+        LocalPlayer.Idled:Connect(function()
+            if antiAfkEnabled then
+                local virtualUser = game:GetService("VirtualUser")
+                virtualUser:CaptureController()
+                virtualUser:ClickButton2(Vector2.new())
+            end
+        end)
+    end)
+
     -- Наземный кастомный СТИЛЬНЫЙ КРУГЛЫЙ Shift-Lock с линиями по бокам
     local MobileShiftLockBtn = Instance.new("TextButton", ScreenGui)
     MobileShiftLockBtn.Name = "MobileShiftLockBtn"
-    MobileShiftLockBtn.Size = UDim2.new(0, 55, 0, 55)
-    MobileShiftLockBtn.Position = UDim2.new(0.85, 0, 0.7, 0)
+    MobileShiftLockBtn.Size = UDim2.new(0, 65, 0, 65)
+    MobileShiftLockBtn.Position = UDim2.new(0.82, 0, 0.65, 0)
     MobileShiftLockBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     MobileShiftLockBtn.BackgroundTransparency = 0.2
     MobileShiftLockBtn.Text = ""
-    MobileShiftLockBtn.Visible = false
+    MobileShiftLockBtn.Visible = true
     Instance.new("UICorner", MobileShiftLockBtn).CornerRadius = UDim.new(1, 0)
     local SLStroke = Instance.new("UIStroke", MobileShiftLockBtn)
     SLStroke.Color = Color3.fromRGB(255, 255, 255)
-    SLStroke.Thickness = 1.5
+    SLStroke.Thickness = 2.5
 
-    -- Внутренний кружок
+    local LeftLine = Instance.new("Frame", MobileShiftLockBtn)
+    LeftLine.Size = UDim2.new(0, 3, 0, 25)
+    LeftLine.Position = UDim2.new(0, -10, 0.5, 0)
+    LeftLine.AnchorPoint = Vector2.new(0, 0.5)
+    LeftLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", LeftLine).CornerRadius = UDim.new(0, 2)
+
+    local RightLine = Instance.new("Frame", MobileShiftLockBtn)
+    RightLine.Size = UDim2.new(0, 3, 0, 25)
+    RightLine.Position = UDim2.new(1, 7, 0.5, 0)
+    RightLine.AnchorPoint = Vector2.new(0, 0.5)
+    RightLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", RightLine).CornerRadius = UDim.new(0, 2)
+
     local InnerCircle = Instance.new("Frame", MobileShiftLockBtn)
-    InnerCircle.Size = UDim2.new(0, 18, 0, 18)
+    InnerCircle.Size = UDim2.new(0, 16, 0, 16)
     InnerCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
     InnerCircle.AnchorPoint = Vector2.new(0.5, 0.5)
     InnerCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     Instance.new("UICorner", InnerCircle).CornerRadius = UDim.new(1, 0)
 
-    -- Левая и правая полоски
-    local LeftLine = Instance.new("Frame", MobileShiftLockBtn)
-    LeftLine.Size = UDim2.new(0, 8, 0, 3)
-    LeftLine.Position = UDim2.new(0.5, -16, 0.5, 0)
-    LeftLine.AnchorPoint = Vector2.new(1, 0.5)
-    LeftLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    LeftLine.BorderSizePixel = 0
-
-    local RightLine = Instance.new("Frame", MobileShiftLockBtn)
-    RightLine.Size = UDim2.new(0, 8, 0, 3)
-    RightLine.Position = UDim2.new(0.5, 16, 0.5, 0)
-    RightLine.AnchorPoint = Vector2.new(0, 0.5)
-    RightLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    RightLine.BorderSizePixel = 0
-
     MobileShiftLockBtn.Activated:Connect(function()
         shiftLockEnabled = not shiftLockEnabled
+        local tInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         if shiftLockEnabled then
-            MobileShiftLockBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            InnerCircle.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-            LeftLine.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-            RightLine.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+            TweenService:Create(MobileShiftLockBtn, tInfo, {BackgroundColor3 = Color3.fromRGB(0, 200, 200), BackgroundTransparency = 0.1}):Play()
+            TweenService:Create(SLStroke, tInfo, {Color = Color3.fromRGB(0, 255, 255)}):Play()
+            TweenService:Create(LeftLine, tInfo, {BackgroundColor3 = Color3.fromRGB(0, 255, 255)}):Play()
+            TweenService:Create(RightLine, tInfo, {BackgroundColor3 = Color3.fromRGB(0, 255, 255)}):Play()
         else
-            MobileShiftLockBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-            InnerCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            LeftLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            RightLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            TweenService:Create(MobileShiftLockBtn, tInfo, {BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.2}):Play()
+            TweenService:Create(SLStroke, tInfo, {Color = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(LeftLine, tInfo, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(RightLine, tInfo, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         end
     end)
@@ -264,7 +314,6 @@ local success, err = pcall(function()
                 end
             end
 
-            -- Логика постоянного следования (Фоллоу)
             if followEnabled and selectedTargetPlayer and selectedTargetPlayer.Character then
                 local tHrp = selectedTargetPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if tHrp and hrp then
@@ -290,7 +339,6 @@ local success, err = pcall(function()
     end
 
     RunService.RenderStepped:Connect(function()
-        -- Логика Shift Lock
         if shiftLockEnabled and LocalPlayer.Character then
             local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
@@ -299,7 +347,6 @@ local success, err = pcall(function()
                 hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + Vector3.new(lookVector.X, 0, lookVector.Z))
             end
         end
-        -- Логика Наблюдения (Spectate)
         if spectateEnabled and selectedTargetPlayer and selectedTargetPlayer.Character and selectedTargetPlayer.Character:FindFirstChildOfClass("Humanoid") then
             Camera.CameraSubject = selectedTargetPlayer.Character:FindFirstChildOfClass("Humanoid")
         else
@@ -412,7 +459,6 @@ local success, err = pcall(function()
     local PlayerButton = CreateMenuTabButton("Player", 2)
     PlayerButton.Visible = false
 
-    -- Кнопка кастомной вкладки целевых игроков
     local TargetPlayersButton = CreateMenuTabButton("Players", 3)
     TargetPlayersButton.Visible = false
 
@@ -445,6 +491,8 @@ local success, err = pcall(function()
     GreyFrame.Visible = true
     local PlayerFrame = CreateCentralScroll("Player")
     local TargetPlayersFrame = CreateCentralScroll("Players") 
+    local KillFrame = CreateCentralScroll("Kill")
+    local TeleportFrame = CreateCentralScroll("Teleport")
     
     local pListLayout = Instance.new("UIListLayout", PlayerFrame)
     pListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -455,8 +503,15 @@ local success, err = pcall(function()
     tpListLayout.Padding = UDim.new(0, 10)
     tpListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
+    local kListLayout = Instance.new("UIListLayout", KillFrame)
+    kListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    kListLayout.Padding = UDim.new(0, 10)
+    kListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
     for _, tKey in ipairs(bhTabsList) do
-        CreateCentralScroll(tKey)
+        if tKey ~= "Kill" and tKey ~= "Teleport" then 
+            CreateCentralScroll(tKey) 
+        end
     end
 
     local DevelopersBlock = Instance.new("Frame", GreyFrame) 
@@ -851,6 +906,7 @@ local success, err = pcall(function()
     end
 
     CreateToggleSwitch(PlayerFrame, "AntiSit", 40, function() return antiSitEnabled end, function() antiSitEnabled = not antiSitEnabled end)
+    CreateToggleSwitch(PlayerFrame, "AntiAFK", 45, function() return antiAfkEnabled end, function() antiAfkEnabled = not antiAfkEnabled end)
     CreateToggleSwitch(PlayerFrame, "InfJump", 50, function() return infJumpEnabled end, function() infJumpEnabled = not infJumpEnabled end)
     CreateToggleSwitch(PlayerFrame, "SwimMode", 60, function() return swimModeEnabled end, function() swimModeEnabled = not swimModeEnabled end)
     CreateToggleSwitch(PlayerFrame, "Noclip", 70, function() return noclipEnabled end, function() noclipEnabled = not noclipEnabled end)
@@ -937,6 +993,8 @@ local success, err = pcall(function()
     RightGreyOvalBtn.ZIndex = 6
     Instance.new("UICorner", RightGreyOvalBtn).CornerRadius = UDim.new(0, 13)
 
+    LeftGreyOvalBtn.Activated:Connect(ToggleInvisible)
+
     local SpacerBeforeModals = Instance.new("Frame", PlayerFrame)
     SpacerBeforeModals.Size = UDim2.new(1, 0, 0, 12)
     SpacerBeforeModals.BackgroundTransparency = 1
@@ -969,13 +1027,12 @@ local success, err = pcall(function()
     FlyModalOpenBtn.ZIndex = 5
     Instance.new("UICorner", FlyModalOpenBtn).CornerRadius = UDim.new(0, 16)
 
-    -- Небольшой отступ в самом низу вкладки Игрок
     local FinalSpacerPlayer = Instance.new("Frame", PlayerFrame)
     FinalSpacerPlayer.Size = UDim2.new(1, 0, 0, 15)
     FinalSpacerPlayer.BackgroundTransparency = 1
     FinalSpacerPlayer.LayoutOrder = 120
 
-    PlayerFrame.CanvasSize = UDim2.new(0, 0, 0, 560)
+    PlayerFrame.CanvasSize = UDim2.new(0, 0, 0, 600)
 
     -------------------------------------------------------
     -- ОКНА "СИДЕТЬ" И "ЛЕТАТЬ"
@@ -1080,12 +1137,9 @@ local success, err = pcall(function()
         end)
     end)
 
-    LeftGreyOvalBtn.Activated:Connect(ToggleInvisible)
-
     -------------------------------------------------------
     -- ВЫДЕЛЕННАЯ КОМПЛЕКСНАЯ ВКЛАДКА "PLAYERS" (ИГРОКИ)
     -------------------------------------------------------
-    -- Пространство сверху вкладки Игроки (чтобы овал не утыкался вверх)
     local TopSpacerPlayers = Instance.new("Frame", TargetPlayersFrame)
     TopSpacerPlayers.Size = UDim2.new(1, 0, 0, 10)
     TopSpacerPlayers.BackgroundTransparency = 1
@@ -1121,7 +1175,7 @@ local success, err = pcall(function()
     PlrSelectNickText.Position = UDim2.new(0, 10, 0, 0)
     PlrSelectNickText.BackgroundTransparency = 1
     PlrSelectNickText.Text = ""
-    PlrSelectNickText.TextColor3 = Color3.fromRGB(170, 170, 170) -- Темно-светло-серый оттенок
+    PlrSelectNickText.TextColor3 = Color3.fromRGB(170, 170, 170)
     PlrSelectNickText.Font = Enum.Font.SourceSansBold
     PlrSelectNickText.TextSize = 11
     PlrSelectNickText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1159,7 +1213,7 @@ local success, err = pcall(function()
                 pBtn.Size = UDim2.new(1, -8, 0, 24)
                 pBtn.Position = UDim2.new(0, 4, 0, 0)
                 pBtn.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
-                pBtn.Text = "  " .. player.Name -- Полное имя игрока
+                pBtn.Text = "  " .. player.Name .. " (" .. player.DisplayName .. ")"
                 pBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
                 pBtn.Font = Enum.Font.SourceSansBold
                 pBtn.TextSize = 12
@@ -1169,10 +1223,10 @@ local success, err = pcall(function()
 
                 pBtn.Activated:Connect(function()
                     selectedTargetPlayer = player
-                    PlrSelectNickText.Text = player.Name -- Полное отображение ника
+                    PlrSelectNickText.Text = player.Name
                     PlrSelectNickText.TextColor3 = Color3.fromRGB(255, 255, 255)
                     PlrDropdownListFrame.Visible = false
-                    TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 460)
+                    TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 450)
                 end)
             end
         end
@@ -1184,10 +1238,10 @@ local success, err = pcall(function()
         if PlrDropdownListFrame.Visible then
             RefreshPlayersDropdown()
             PlrDropdownListFrame.Size = UDim2.new(1, -12, 0, 90)
-            TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 550)
+            TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 540)
         else
             PlrDropdownListFrame.Size = UDim2.new(1, -12, 0, 0)
-            TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 460)
+            TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 450)
         end
     end)
 
@@ -1200,7 +1254,7 @@ local success, err = pcall(function()
     GetToolButton.ZIndex = 5
     Instance.new("UICorner", GetToolButton).CornerRadius = UDim.new(0, 8)
 
-    GetToolButton.Activated:Connect(function()
+    local function SetupToolSelection(callback)
         local character = LocalPlayer.Character
         local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
         if not backpack or not character then return end
@@ -1218,9 +1272,7 @@ local success, err = pcall(function()
                     if target and target.Parent and target.Parent:FindFirstChildOfClass("Humanoid") then
                         local clickedPlr = Players:GetPlayerFromCharacter(target.Parent)
                         if clickedPlr and clickedPlr ~= LocalPlayer then
-                            selectedTargetPlayer = clickedPlr
-                            PlrSelectNickText.Text = clickedPlr.Name
-                            PlrSelectNickText.TextColor3 = Color3.fromRGB(255, 255, 255)
+                            callback(clickedPlr)
                         end
                     end
                 else
@@ -1229,6 +1281,14 @@ local success, err = pcall(function()
             end)
         end)
         targetTool.Parent = backpack
+    end
+
+    GetToolButton.Activated:Connect(function()
+        SetupToolSelection(function(clickedPlr)
+            selectedTargetPlayer = clickedPlr
+            PlrSelectNickText.Text = clickedPlr.Name
+            PlrSelectNickText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
     end)
 
     local PlrSeparatorLine1 = Instance.new("Frame", TargetPlayersFrame)
@@ -1253,7 +1313,6 @@ local success, err = pcall(function()
         end
     end)
 
-    -- Кнопка Spectate Player
     local SpectateContainer = Instance.new("Frame", TargetPlayersFrame)
     SpectateContainer.Size = UDim2.new(1, -16, 0, 36)
     SpectateContainer.BackgroundTransparency = 1; SpectateContainer.ZIndex = 4
@@ -1283,7 +1342,6 @@ local success, err = pcall(function()
         end
     end)
 
-    -- НОВАЯ ФУНКЦИЯ: Следовать за игроком (Loop-Телепорт)
     local FollowContainer = Instance.new("Frame", TargetPlayersFrame)
     FollowContainer.Size = UDim2.new(1, -16, 0, 36)
     FollowContainer.BackgroundTransparency = 1; FollowContainer.ZIndex = 4
@@ -1307,13 +1365,75 @@ local success, err = pcall(function()
         if followEnabled then
             TweenService:Create(FollowTFrame, tInfo, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             TweenService:Create(FollowTCircle, tInfo, {Position = UDim2.new(1, -19, 0.5, -8), BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
+            FollowLbl.Text = "  " .. Localization[currentLanguage].FollowPlrOn
         else
             TweenService:Create(FollowTFrame, tInfo, {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
             TweenService:Create(FollowTCircle, tInfo, {Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            FollowLbl.Text = "  " .. Localization[currentLanguage].FollowPlr
         end
     end)
 
-    -- Кнопка Подсветить игрока (Синее ESP + Название + Дистанция)
+    -- КНОПКА ЗАХВАТ ДИВАНОМ НА СТАРТ
+    local KidnapBtn = Instance.new("TextButton", TargetPlayersFrame)
+    KidnapBtn.Size = UDim2.new(1, -16, 0, 35)
+    KidnapBtn.BackgroundColor3 = Color3.fromRGB(110, 0, 150)
+    KidnapBtn.Text = Localization[currentLanguage].SofaKidnap
+    KidnapBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    KidnapBtn.Font = Enum.Font.SourceSansBold
+    KidnapBtn.ZIndex = 5
+    Instance.new("UICorner", KidnapBtn).CornerRadius = UDim.new(0, 8)
+
+    KidnapBtn.Activated:Connect(function()
+        if selectedTargetPlayer and selectedTargetPlayer.Character then
+            local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local tRoot = selectedTargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if pRoot and tRoot then
+                -- Сохраняем начальную позицию
+                startPosition = pRoot.CFrame
+                
+                -- Берем диван
+                local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                local sofaTool = nil
+                if bp then
+                    for _, tool in ipairs(bp:GetChildren()) do
+                        if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                            sofaTool = tool
+                            break
+                        end
+                    end
+                end
+                if not sofaTool then
+                    -- Поиск в Character
+                    local char = LocalPlayer.Character
+                    if char then
+                        for _, tool in ipairs(char:GetChildren()) do
+                            if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                                sofaTool = tool
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if sofaTool then
+                    sofaTool.Parent = LocalPlayer.Character
+                    task.wait(0.2)
+                    
+                    -- Телепортируем к игроку
+                    pRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, -2)
+                    task.wait(1)
+                    
+                    -- Захватываем и телепортируем на старт
+                    pRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
+                    task.wait(0.3)
+                    pRoot.CFrame = startPosition
+                    tRoot.CFrame = startPosition * CFrame.new(0, 0, 2)
+                end
+            end
+        end
+    end)
+
+    -- Остальные элементы Players (ESP, Sign и т.д.)
     local SingleEspContainer = Instance.new("Frame", TargetPlayersFrame)
     SingleEspContainer.Size = UDim2.new(1, -16, 0, 36)
     SingleEspContainer.BackgroundTransparency = 1; SingleEspContainer.ZIndex = 4
@@ -1338,14 +1458,12 @@ local success, err = pcall(function()
             TweenService:Create(SEspTFrame, tInfo, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             TweenService:Create(SEspTCircle, tInfo, {Position = UDim2.new(1, -19, 0.5, -8), BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
             if selectedTargetPlayer and selectedTargetPlayer.Character then
-                -- Подсветка СИНИМ цветом
                 local hl = selectedTargetPlayer.Character:FindFirstChild("NexusPlrESP") or Instance.new("Highlight")
                 hl.Name = "NexusPlrESP"
                 hl.FillColor = Color3.fromRGB(0, 120, 255)
                 hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                 hl.Parent = selectedTargetPlayer.Character
 
-                -- Создание 3D текста над головой для отображения имени и дистанции
                 local head = selectedTargetPlayer.Character:FindFirstChild("Head")
                 if head then
                     local bb = Instance.new("BillboardGui")
@@ -1369,17 +1487,17 @@ local success, err = pcall(function()
             TweenService:Create(SEspTFrame, tInfo, {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
             TweenService:Create(SEspTCircle, tInfo, {Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             if selectedTargetPlayer and selectedTargetPlayer.Character then
-                if selectedTargetPlayer.Character:FindFirstChild("NexusPlrESP") then
-                    selectedTargetPlayer.Character.NexusPlrESP:Destroy()
-                end
-                if selectedTargetPlayer.Character:FindFirstChild("NexusEspBillboard") then
-                    selectedTargetPlayer.Character.NexusEspBillboard:Destroy()
-                end
+                if selectedTargetPlayer.Character:FindFirstChild("NexusPlrESP") then selectedTargetPlayer.Character.NexusPlrESP:Destroy() end
+                if selectedTargetPlayer.Character:FindFirstChild("NexusEspBillboard") then selectedTargetPlayer.Character.NexusEspBillboard:Destroy() end
             end
         end
     end)
 
-    -- Кнопка Подсветить всех (Перенесена под Подсветить Игрока)
+    local PlrSeparatorLineBeforeAll = Instance.new("Frame", TargetPlayersFrame)
+    PlrSeparatorLineBeforeAll.Size = UDim2.new(1, -10, 0, 2)
+    PlrSeparatorLineBeforeAll.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    PlrSeparatorLineBeforeAll.ZIndex = 4
+
     local AllEspContainer = Instance.new("Frame", TargetPlayersFrame)
     AllEspContainer.Size = UDim2.new(1, -16, 0, 36)
     AllEspContainer.BackgroundTransparency = 1; AllEspContainer.ZIndex = 4
@@ -1425,29 +1543,27 @@ local success, err = pcall(function()
         updateAllEsp()
     end)
 
-    -- ЛИНИЯ ТЕПЕРЬ ОГРАНИЧЕНА В ОДИНОЧЕСТВЕ ПОСЛЕ "ПОДСВЕТИТЬ ВСЕХ"
     local PlrSeparatorLine2 = Instance.new("Frame", TargetPlayersFrame)
     PlrSeparatorLine2.Size = UDim2.new(1, -10, 0, 2)
     PlrSeparatorLine2.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     PlrSeparatorLine2.ZIndex = 4
 
-    -- Поле ввода таблички
     local SignTextBoxOval = Instance.new("TextBox", TargetPlayersFrame)
     SignTextBoxOval.Size = UDim2.new(0.85, 0, 0, 32)
     SignTextBoxOval.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
     SignTextBoxOval.Font = Enum.Font.SourceSansBold
     SignTextBoxOval.TextColor3 = Color3.fromRGB(255, 255, 255)
     SignTextBoxOval.TextSize = 13
+    SignTextBoxOval.Text = "" 
     SignTextBoxOval.ZIndex = 5
     Instance.new("UICorner", SignTextBoxOval).CornerRadius = UDim.new(0, 16)
     local SignStroke = Instance.new("UIStroke", SignTextBoxOval)
     SignStroke.Color = Color3.fromRGB(70, 70, 70)
     SignStroke.Thickness = 1
 
-    -- Кнопка Написать (Сделана ТЕМНО-СЕРЫМ цветом)
     local WriteSignButton = Instance.new("TextButton", TargetPlayersFrame)
     WriteSignButton.Size = UDim2.new(0.6, 0, 0, 28)
-    WriteSignButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35) -- Более глубокий темно-серый
+    WriteSignButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35) 
     WriteSignButton.Font = Enum.Font.SourceSansBold
     WriteSignButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     WriteSignButton.TextSize = 13
@@ -1467,8 +1583,1044 @@ local success, err = pcall(function()
         end
     end)
 
-    TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 460)
+    local FinalSpacerPlayersTab = Instance.new("Frame", TargetPlayersFrame)
+    FinalSpacerPlayersTab.Size = UDim2.new(1, 0, 0, 45)
+    FinalSpacerPlayersTab.BackgroundTransparency = 1
+    FinalSpacerPlayersTab.ZIndex = 3
 
+    TargetPlayersFrame.CanvasSize = UDim2.new(0, 0, 0, 520)
+
+    -------------------------------------------------------
+    -- ВЫДЕЛЕННАЯ ВКЛАДКА "KILL" (КИЛЛ) - РАСШИРЕННАЯ
+    -------------------------------------------------------
+    local TopSpacerKill = Instance.new("Frame", KillFrame)
+    TopSpacerKill.Size = UDim2.new(1, 0, 0, 10)
+    TopSpacerKill.BackgroundTransparency = 1
+    TopSpacerKill.ZIndex = 3
+
+    -- Выбор метода Килла (ОВАЛ С ВЫПАДАЮЩИМ СПИСКОМ)
+    local KillMethodBtn = Instance.new("TextButton", KillFrame)
+    KillMethodBtn.Size = UDim2.new(1, -16, 0, 32)
+    KillMethodBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    KillMethodBtn.Text = Localization[currentLanguage].SelectMethod
+    KillMethodBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    KillMethodBtn.ZIndex = 5
+    Instance.new("UICorner", KillMethodBtn).CornerRadius = UDim.new(0, 8)
+
+    local KillMethodArrow = Instance.new("TextLabel", KillMethodBtn)
+    KillMethodArrow.Size = UDim2.new(0, 12, 0, 12)
+    KillMethodArrow.BackgroundTransparency = 1
+    KillMethodArrow.Text = "▼"
+    KillMethodArrow.TextColor3 = Color3.fromRGB(200, 200, 200)
+    KillMethodArrow.Font = Enum.Font.SourceSansBold
+    KillMethodArrow.TextSize = 10
+    KillMethodArrow.Position = UDim2.new(1, -16, 0.5, -6)
+    KillMethodArrow.ZIndex = 6
+
+    local KillMethodDropdown = Instance.new("Frame", KillFrame)
+    KillMethodDropdown.Size = UDim2.new(1, -16, 0, 0)
+    KillMethodDropdown.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    KillMethodDropdown.Visible = false
+    KillMethodDropdown.ZIndex = 6
+    KillMethodDropdown.ClipsDescendants = true
+    Instance.new("UICorner", KillMethodDropdown).CornerRadius = UDim.new(0, 8)
+
+    local killMethods = {"Sofa (Диван)", "Fling (Выталкивание)", "Tools (Инструменты)"}
+    selectedKillMethod = killMethods[1]
+    for i, m in ipairs(killMethods) do
+        local b = Instance.new("TextButton", KillMethodDropdown)
+        b.Size = UDim2.new(1, 0, 0, 24)
+        b.BackgroundTransparency = 1
+        b.Text = m
+        b.TextColor3 = Color3.fromRGB(200, 200, 200)
+        b.Font = Enum.Font.SourceSans
+        b.TextSize = 13
+        b.Activated:Connect(function()
+            selectedKillMethod = m
+            KillMethodBtn.Text = "Метод: " .. m
+            KillMethodDropdown.Visible = false
+            KillMethodDropdown.Size = UDim2.new(1, -16, 0, 0)
+        end)
+    end
+
+    KillMethodBtn.Activated:Connect(function()
+        KillMethodDropdown.Visible = not KillMethodDropdown.Visible
+        KillMethodDropdown.Size = KillMethodDropdown.Visible and UDim2.new(1, -16, 0, #killMethods * 24 + 8) or UDim2.new(1, -16, 0, 0)
+    end)
+
+    -- Выбор игрока для килла
+    local KillSelectMainFrame = Instance.new("Frame", KillFrame)
+    KillSelectMainFrame.Size = UDim2.new(1, -12, 0, 36)
+    KillSelectMainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    KillSelectMainFrame.ZIndex = 4
+    Instance.new("UICorner", KillSelectMainFrame).CornerRadius = UDim.new(0, 18)
+
+    local KillSelectLeftTitle = Instance.new("TextLabel", KillSelectMainFrame)
+    KillSelectLeftTitle.Size = UDim2.new(0.35, 0, 1, 0)
+    KillSelectLeftTitle.Position = UDim2.new(0, 14, 0, 0)
+    KillSelectLeftTitle.BackgroundTransparency = 1
+    KillSelectLeftTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    KillSelectLeftTitle.Font = Enum.Font.SourceSansBold
+    KillSelectLeftTitle.TextSize = 13
+    KillSelectLeftTitle.TextXAlignment = Enum.TextXAlignment.Left
+    KillSelectLeftTitle.ZIndex = 5
+
+    local KillSelectRightOval = Instance.new("TextButton", KillSelectMainFrame)
+    KillSelectRightOval.Size = UDim2.new(0.6, 0, 0, 26)
+    KillSelectRightOval.Position = UDim2.new(1, -6, 0.5, -13)
+    KillSelectRightOval.AnchorPoint = Vector2.new(1, 0)
+    KillSelectRightOval.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    KillSelectRightOval.Text = ""
+    KillSelectRightOval.ZIndex = 5
+    Instance.new("UICorner", KillSelectRightOval).CornerRadius = UDim.new(0, 13)
+
+    local KillSelectNickText = Instance.new("TextLabel", KillSelectRightOval)
+    KillSelectNickText.Size = UDim2.new(1, -22, 1, 0)
+    KillSelectNickText.Position = UDim2.new(0, 10, 0, 0)
+    KillSelectNickText.BackgroundTransparency = 1
+    KillSelectNickText.Text = ""
+    KillSelectNickText.TextColor3 = Color3.fromRGB(170, 170, 170)
+    KillSelectNickText.Font = Enum.Font.SourceSansBold
+    KillSelectNickText.TextSize = 11
+    KillSelectNickText.TextXAlignment = Enum.TextXAlignment.Left
+    KillSelectNickText.ZIndex = 6
+
+    local KillSelectArrow = Instance.new("TextLabel", KillSelectRightOval)
+    KillSelectArrow.Size = UDim2.new(0, 12, 0, 12)
+    KillSelectArrow.Position = UDim2.new(1, -16, 0.5, -6)
+    KillSelectArrow.BackgroundTransparency = 1
+    KillSelectArrow.Text = "▼"
+    KillSelectArrow.TextColor3 = Color3.fromRGB(255, 255, 255)
+    KillSelectArrow.Font = Enum.Font.SourceSansBold
+    KillSelectArrow.TextSize = 9
+    KillSelectArrow.ZIndex = 6
+
+    local KillDropdownListFrame = Instance.new("ScrollingFrame", KillFrame)
+    KillDropdownListFrame.Size = UDim2.new(1, -12, 0, 0)
+    KillDropdownListFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+    KillDropdownListFrame.Visible = false
+    KillDropdownListFrame.ZIndex = 10
+    KillDropdownListFrame.ScrollBarThickness = 3
+    Instance.new("UICorner", KillDropdownListFrame).CornerRadius = UDim.new(0, 10)
+    local kdlLayout = Instance.new("UIListLayout", KillDropdownListFrame)
+    kdlLayout.Padding = UDim.new(0, 4)
+
+    local function RefreshKillDropdown()
+        for _, c in ipairs(KillDropdownListFrame:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        local index = 0
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                index = index + 1
+                local pBtn = Instance.new("TextButton", KillDropdownListFrame)
+                pBtn.Size = UDim2.new(1, -8, 0, 24)
+                pBtn.Position = UDim2.new(0, 4, 0, 0)
+                pBtn.BackgroundColor3 = Color3.fromRGB(33, 33, 33)
+                pBtn.Text = "  " .. player.Name
+                pBtn.TextColor3 = Color3.fromRGB(230, 230, 230)
+                pBtn.Font = Enum.Font.SourceSansBold
+                pBtn.TextSize = 12
+                pBtn.TextXAlignment = Enum.TextXAlignment.Left
+                pBtn.ZIndex = 11
+                Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 5)
+
+                pBtn.Activated:Connect(function()
+                    selectedKillPlayer = player
+                    KillSelectNickText.Text = player.Name
+                    KillSelectNickText.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    KillDropdownListFrame.Visible = false
+                end)
+            end
+        end
+        KillDropdownListFrame.CanvasSize = UDim2.new(0, 0, 0, index * 28 + 10)
+    end
+
+    KillSelectRightOval.Activated:Connect(function()
+        KillDropdownListFrame.Visible = not KillDropdownListFrame.Visible
+        if KillDropdownListFrame.Visible then
+            RefreshKillDropdown()
+            KillDropdownListFrame.Size = UDim2.new(1, -12, 0, 90)
+        else
+            KillDropdownListFrame.Size = UDim2.new(1, -12, 0, 0)
+        end
+    end)
+
+    local GetKillToolButton = Instance.new("TextButton", KillFrame)
+    GetKillToolButton.Size = UDim2.new(1, -16, 0, 30)
+    GetKillToolButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    GetKillToolButton.Font = Enum.Font.SourceSansBold
+    GetKillToolButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    GetKillToolButton.TextSize = 13
+    GetKillToolButton.ZIndex = 5
+    Instance.new("UICorner", GetKillToolButton).CornerRadius = UDim.new(0, 8)
+
+    GetKillToolButton.Activated:Connect(function()
+        SetupToolSelection(function(clickedPlr)
+            selectedKillPlayer = clickedPlr
+            KillSelectNickText.Text = clickedPlr.Name
+            KillSelectNickText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end)
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local KillSeparatorLine1 = Instance.new("Frame", KillFrame)
+    KillSeparatorLine1.Size = UDim2.new(1, -10, 0, 2)
+    KillSeparatorLine1.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    KillSeparatorLine1.ZIndex = 4
+
+    -- БЫСТРЫЙ КИЛЛ (Tool) - убивает сразу выбранным методом
+    local FastKillBtn = Instance.new("TextButton", KillFrame)
+    FastKillBtn.Size = UDim2.new(1, -16, 0, 35)
+    FastKillBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    FastKillBtn.Text = Localization[currentLanguage].FastKill
+    FastKillBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FastKillBtn.Font = Enum.Font.SourceSansBold
+    FastKillBtn.ZIndex = 5
+    Instance.new("UICorner", FastKillBtn).CornerRadius = UDim.new(0, 8)
+
+    FastKillBtn.Activated:Connect(function()
+        if selectedKillPlayer and selectedKillPlayer.Character then
+            local hum = selectedKillPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                if selectedKillMethod == "Sofa (Диван)" then
+                    -- Ищем диван
+                    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                    local sofaTool = nil
+                    if bp then
+                        for _, tool in ipairs(bp:GetChildren()) do
+                            if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                                sofaTool = tool
+                                break
+                            end
+                        end
+                    end
+                    if sofaTool then
+                        sofaTool.Parent = LocalPlayer.Character
+                        task.wait(0.1)
+                        local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if pRoot and tRoot then
+                            pRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
+                            task.wait(0.3)
+                            hum.Health = 0
+                        end
+                    else
+                        hum.Health = 0 -- если нет дивана, просто убиваем
+                    end
+                elseif selectedKillMethod == "Fling (Выталкивание)" then
+                    local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if pRoot and tRoot then
+                        tRoot.Velocity = Vector3.new(0, 1000, 0)
+                        task.wait(0.1)
+                        hum.Health = 0
+                    end
+                else -- Tools (Инструменты)
+                    hum.Health = 0
+                end
+            end
+        end
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local KillSeparatorLine2 = Instance.new("Frame", KillFrame)
+    KillSeparatorLine2.Size = UDim2.new(1, -10, 0, 2)
+    KillSeparatorLine2.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    KillSeparatorLine2.ZIndex = 4
+
+    -- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ПЕРЕТЯГОВ
+    local function CreateKillToggle(parent, textKey, layoutOrder, stateRef, onToggle)
+        local TContainer = Instance.new("Frame", parent)
+        TContainer.Size = UDim2.new(1, -16, 0, 35)
+        TContainer.BackgroundTransparency = 1
+        TContainer.LayoutOrder = layoutOrder or 10
+        TContainer.ZIndex = 4
+
+        local TLbl = Instance.new("TextLabel", TContainer)
+        TLbl.Size = UDim2.new(0.65, 0, 1, 0)
+        TLbl.Position = UDim2.new(0, 10, 0, 0)
+        TLbl.BackgroundTransparency = 1
+        TLbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+        TLbl.Font = Enum.Font.SourceSansBold
+        TLbl.TextSize = 13
+        TLbl.TextXAlignment = Enum.TextXAlignment.Left
+        TLbl.ZIndex = 5
+
+        local TFrame = Instance.new("TextButton", TContainer)
+        TFrame.Size = UDim2.new(0, 42, 0, 22)
+        TFrame.Position = UDim2.new(1, -44, 0.5, -11)
+        TFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20) 
+        TFrame.Text = ""
+        TFrame.ZIndex = 5
+        Instance.new("UICorner", TFrame).CornerRadius = UDim.new(1, 0)
+        
+        local TStroke = Instance.new("UIStroke", TFrame)
+        TStroke.Color = Color3.fromRGB(255, 255, 255)
+        TStroke.Thickness = 1
+
+        local TCircle = Instance.new("Frame", TFrame)
+        TCircle.Size = UDim2.new(0, 16, 0, 16)
+        TCircle.Position = UDim2.new(0, 3, 0.5, -8)
+        TCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255) 
+        TCircle.ZIndex = 6
+        Instance.new("UICorner", TCircle).CornerRadius = UDim.new(1, 0)
+
+        local function updateVisuals(enabled)
+            local tInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            if enabled then
+                TweenService:Create(TFrame, tInfo, {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+                TweenService:Create(TCircle, tInfo, {Position = UDim2.new(1, -19, 0.5, -8), BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
+            else
+                TweenService:Create(TFrame, tInfo, {BackgroundColor3 = Color3.fromRGB(20, 20, 20)}):Play()
+                TweenService:Create(TCircle, tInfo, {Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            end
+        end
+
+        TFrame.Activated:Connect(function()
+            onToggle()
+            updateVisuals(stateRef())
+        end)
+
+        return TContainer, TFrame, function() updateVisuals(stateRef()) end
+    end
+
+    -- АВТОКИЛЛЫ
+    local autoKillPlrEnabled = false
+    local autoKillAllEnabled = false
+    local autoManualEnabled = false
+    local killLoopActive = true
+
+    local killContainer1, _, updateKillPlr = CreateKillToggle(KillFrame, Localization[currentLanguage].AutoKillPlr, 15, function() return autoKillPlrEnabled end, function() 
+        autoKillPlrEnabled = not autoKillPlrEnabled
+        killLoopActive = true
+        if autoKillPlrEnabled or autoKillAllEnabled or autoManualEnabled then
+            task.spawn(function()
+                while killLoopActive and (autoKillPlrEnabled or autoKillAllEnabled or autoManualEnabled) do
+                    if autoKillPlrEnabled and selectedKillPlayer and selectedKillPlayer.Character then
+                        local hum = selectedKillPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            if selectedKillMethod == "Sofa (Диван)" then
+                                -- Поиск дивана
+                                local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                                local sofaTool = nil
+                                if bp then
+                                    for _, tool in ipairs(bp:GetChildren()) do
+                                        if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                                            sofaTool = tool
+                                            break
+                                        end
+                                    end
+                                end
+                                if sofaTool then
+                                    sofaTool.Parent = LocalPlayer.Character
+                                    task.wait(0.1)
+                                    local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    if pRoot and tRoot then
+                                        pRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
+                                        task.wait(0.3)
+                                        hum.Health = 0
+                                    end
+                                else
+                                    hum.Health = 0
+                                end
+                            elseif selectedKillMethod == "Fling (Выталкивание)" then
+                                local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if pRoot and tRoot then
+                                    tRoot.Velocity = Vector3.new(0, 1000, 0)
+                                    task.wait(0.1)
+                                    hum.Health = 0
+                                end
+                            else
+                                hum.Health = 0
+                            end
+                        end
+                    end
+
+                    if autoKillAllEnabled then
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    hum.Health = 0
+                                end
+                            end
+                        end
+                    end
+
+                    if autoManualEnabled then
+                        -- Авто ручной килл - нужно просто убивать ближайшего игрока
+                        local nearestDist = math.huge
+                        local nearestPlayer = nil
+                        local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if pRoot then
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and player.Character then
+                                    local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                    if tRoot then
+                                        local dist = (tRoot.Position - pRoot.Position).Magnitude
+                                        if dist < nearestDist then
+                                            nearestDist = dist
+                                            nearestPlayer = player
+                                        end
+                                    end
+                                end
+                            end
+                            if nearestPlayer and nearestPlayer.Character then
+                                local hum = nearestPlayer.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    hum.Health = 0
+                                end
+                            end
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end)
+
+    local killContainer2, _, updateKillAll = CreateKillToggle(KillFrame, Localization[currentLanguage].AutoKillAll, 20, function() return autoKillAllEnabled end, function() 
+        autoKillAllEnabled = not autoKillAllEnabled
+        killLoopActive = true
+        if autoKillPlrEnabled or autoKillAllEnabled or autoManualEnabled then
+            task.spawn(function()
+                while killLoopActive and (autoKillPlrEnabled or autoKillAllEnabled or autoManualEnabled) do
+                    -- Логика та же, что и выше
+                    if autoKillPlrEnabled and selectedKillPlayer and selectedKillPlayer.Character then
+                        local hum = selectedKillPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            if selectedKillMethod == "Sofa (Диван)" then
+                                local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                                local sofaTool = nil
+                                if bp then
+                                    for _, tool in ipairs(bp:GetChildren()) do
+                                        if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                                            sofaTool = tool
+                                            break
+                                        end
+                                    end
+                                end
+                                if sofaTool then
+                                    sofaTool.Parent = LocalPlayer.Character
+                                    task.wait(0.1)
+                                    local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    if pRoot and tRoot then
+                                        pRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
+                                        task.wait(0.3)
+                                        hum.Health = 0
+                                    end
+                                else
+                                    hum.Health = 0
+                                end
+                            elseif selectedKillMethod == "Fling (Выталкивание)" then
+                                local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if pRoot and tRoot then
+                                    tRoot.Velocity = Vector3.new(0, 1000, 0)
+                                    task.wait(0.1)
+                                    hum.Health = 0
+                                end
+                            else
+                                hum.Health = 0
+                            end
+                        end
+                    end
+
+                    if autoKillAllEnabled then
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    hum.Health = 0
+                                end
+                            end
+                        end
+                    end
+
+                    if autoManualEnabled then
+                        local nearestDist = math.huge
+                        local nearestPlayer = nil
+                        local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if pRoot then
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and player.Character then
+                                    local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                    if tRoot then
+                                        local dist = (tRoot.Position - pRoot.Position).Magnitude
+                                        if dist < nearestDist then
+                                            nearestDist = dist
+                                            nearestPlayer = player
+                                        end
+                                    end
+                                end
+                            end
+                            if nearestPlayer and nearestPlayer.Character then
+                                local hum = nearestPlayer.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    hum.Health = 0
+                                end
+                            end
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end)
+
+    local killContainer3, _, updateManual = CreateKillToggle(KillFrame, Localization[currentLanguage].AutoManualKill, 25, function() return autoManualEnabled end, function() 
+        autoManualEnabled = not autoManualEnabled
+        killLoopActive = true
+        if autoKillPlrEnabled or autoKillAllEnabled or autoManualEnabled then
+            task.spawn(function()
+                while killLoopActive and (autoKillPlrEnabled or autoKillAllEnabled or autoManualEnabled) do
+                    -- Та же логика
+                    if autoKillPlrEnabled and selectedKillPlayer and selectedKillPlayer.Character then
+                        local hum = selectedKillPlayer.Character:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            if selectedKillMethod == "Sofa (Диван)" then
+                                local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                                local sofaTool = nil
+                                if bp then
+                                    for _, tool in ipairs(bp:GetChildren()) do
+                                        if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                                            sofaTool = tool
+                                            break
+                                        end
+                                    end
+                                end
+                                if sofaTool then
+                                    sofaTool.Parent = LocalPlayer.Character
+                                    task.wait(0.1)
+                                    local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    if pRoot and tRoot then
+                                        pRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 2)
+                                        task.wait(0.3)
+                                        hum.Health = 0
+                                    end
+                                else
+                                    hum.Health = 0
+                                end
+                            elseif selectedKillMethod == "Fling (Выталкивание)" then
+                                local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                if pRoot and tRoot then
+                                    tRoot.Velocity = Vector3.new(0, 1000, 0)
+                                    task.wait(0.1)
+                                    hum.Health = 0
+                                end
+                            else
+                                hum.Health = 0
+                            end
+                        end
+                    end
+
+                    if autoKillAllEnabled then
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    hum.Health = 0
+                                end
+                            end
+                        end
+                    end
+
+                    if autoManualEnabled then
+                        local nearestDist = math.huge
+                        local nearestPlayer = nil
+                        local pRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if pRoot then
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and player.Character then
+                                    local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                    if tRoot then
+                                        local dist = (tRoot.Position - pRoot.Position).Magnitude
+                                        if dist < nearestDist then
+                                            nearestDist = dist
+                                            nearestPlayer = player
+                                        end
+                                    end
+                                end
+                            end
+                            if nearestPlayer and nearestPlayer.Character then
+                                local hum = nearestPlayer.Character:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    hum.Health = 0
+                                end
+                            end
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local KillSeparatorLine3 = Instance.new("Frame", KillFrame)
+    KillSeparatorLine3.Size = UDim2.new(1, -10, 0, 2)
+    KillSeparatorLine3.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    KillSeparatorLine3.ZIndex = 4
+
+    -- ОСТАНОВИТЬ КИЛЛЫ (ОВАЛ)
+    local StopKillsBtn = Instance.new("TextButton", KillFrame)
+    StopKillsBtn.Size = UDim2.new(1, -16, 0, 32)
+    StopKillsBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+    StopKillsBtn.Text = Localization[currentLanguage].StopKills
+    StopKillsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    StopKillsBtn.Font = Enum.Font.SourceSansBold
+    StopKillsBtn.ZIndex = 5
+    Instance.new("UICorner", StopKillsBtn).CornerRadius = UDim.new(0, 8)
+
+    StopKillsBtn.Activated:Connect(function() 
+        killLoopActive = false
+        autoKillPlrEnabled = false
+        autoKillAllEnabled = false
+        autoManualEnabled = false
+        if updateKillPlr then updateKillPlr() end
+        if updateKillAll then updateKillAll() end
+        if updateManual then updateManual() end
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local KillSeparatorLine4 = Instance.new("Frame", KillFrame)
+    KillSeparatorLine4.Size = UDim2.new(1, -10, 0, 2)
+    KillSeparatorLine4.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    KillSeparatorLine4.ZIndex = 4
+
+    -- ФЛИНГИ
+    local flingPlrEnabled = false
+    local flingAllEnabled = false
+    local flingDoorsEnabled = false
+    local flingLoopActive = true
+
+    local flingContainer1, _, updateFlingPlr = CreateKillToggle(KillFrame, Localization[currentLanguage].FlingPlr, 30, function() return flingPlrEnabled end, function() 
+        flingPlrEnabled = not flingPlrEnabled
+        flingLoopActive = true
+        if flingPlrEnabled or flingAllEnabled or flingDoorsEnabled then
+            task.spawn(function()
+                while flingLoopActive and (flingPlrEnabled or flingAllEnabled or flingDoorsEnabled) do
+                    if flingPlrEnabled and selectedKillPlayer and selectedKillPlayer.Character then
+                        local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if tRoot then
+                            tRoot.Velocity = Vector3.new(0, 500, 0)
+                            tRoot.CFrame = tRoot.CFrame * CFrame.new(0, 10, 0)
+                        end
+                    end
+
+                    if flingAllEnabled then
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                if tRoot then
+                                    tRoot.Velocity = Vector3.new(0, 500, 0)
+                                    tRoot.CFrame = tRoot.CFrame * CFrame.new(0, 10, 0)
+                                end
+                            end
+                        end
+                    end
+
+                    if flingDoorsEnabled then
+                        for _, door in ipairs(Workspace:GetDescendants()) do
+                            if door:IsA("BasePart") and (door.Name:lower():find("door") or door.Name:lower():find("дверь")) then
+                                door.Velocity = Vector3.new(0, 200, 0)
+                                door.CFrame = door.CFrame * CFrame.new(0, 5, 0)
+                            end
+                        end
+                    end
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end)
+
+    local flingContainer2, _, updateFlingAll = CreateKillToggle(KillFrame, Localization[currentLanguage].FlingAll, 35, function() return flingAllEnabled end, function() 
+        flingAllEnabled = not flingAllEnabled
+        flingLoopActive = true
+        if flingPlrEnabled or flingAllEnabled or flingDoorsEnabled then
+            task.spawn(function()
+                while flingLoopActive and (flingPlrEnabled or flingAllEnabled or flingDoorsEnabled) do
+                    if flingPlrEnabled and selectedKillPlayer and selectedKillPlayer.Character then
+                        local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if tRoot then
+                            tRoot.Velocity = Vector3.new(0, 500, 0)
+                            tRoot.CFrame = tRoot.CFrame * CFrame.new(0, 10, 0)
+                        end
+                    end
+
+                    if flingAllEnabled then
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                if tRoot then
+                                    tRoot.Velocity = Vector3.new(0, 500, 0)
+                                    tRoot.CFrame = tRoot.CFrame * CFrame.new(0, 10, 0)
+                                end
+                            end
+                        end
+                    end
+
+                    if flingDoorsEnabled then
+                        for _, door in ipairs(Workspace:GetDescendants()) do
+                            if door:IsA("BasePart") and (door.Name:lower():find("door") or door.Name:lower():find("дверь")) then
+                                door.Velocity = Vector3.new(0, 200, 0)
+                                door.CFrame = door.CFrame * CFrame.new(0, 5, 0)
+                            end
+                        end
+                    end
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end)
+
+    local flingContainer3, _, updateFlingDoors = CreateKillToggle(KillFrame, Localization[currentLanguage].FlingDoors, 40, function() return flingDoorsEnabled end, function() 
+        flingDoorsEnabled = not flingDoorsEnabled
+        flingLoopActive = true
+        if flingPlrEnabled or flingAllEnabled or flingDoorsEnabled then
+            task.spawn(function()
+                while flingLoopActive and (flingPlrEnabled or flingAllEnabled or flingDoorsEnabled) do
+                    if flingPlrEnabled and selectedKillPlayer and selectedKillPlayer.Character then
+                        local tRoot = selectedKillPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if tRoot then
+                            tRoot.Velocity = Vector3.new(0, 500, 0)
+                            tRoot.CFrame = tRoot.CFrame * CFrame.new(0, 10, 0)
+                        end
+                    end
+
+                    if flingAllEnabled then
+                        for _, player in ipairs(Players:GetPlayers()) do
+                            if player ~= LocalPlayer and player.Character then
+                                local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                                if tRoot then
+                                    tRoot.Velocity = Vector3.new(0, 500, 0)
+                                    tRoot.CFrame = tRoot.CFrame * CFrame.new(0, 10, 0)
+                                end
+                            end
+                        end
+                    end
+
+                    if flingDoorsEnabled then
+                        for _, door in ipairs(Workspace:GetDescendants()) do
+                            if door:IsA("BasePart") and (door.Name:lower():find("door") or door.Name:lower():find("дверь")) then
+                                door.Velocity = Vector3.new(0, 200, 0)
+                                door.CFrame = door.CFrame * CFrame.new(0, 5, 0)
+                            end
+                        end
+                    end
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local KillSeparatorLine5 = Instance.new("Frame", KillFrame)
+    KillSeparatorLine5.Size = UDim2.new(1, -10, 0, 2)
+    KillSeparatorLine5.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    KillSeparatorLine5.ZIndex = 4
+
+    -- ОСТАНОВИТЬ ФЛИНГ (ОВАЛ)
+    local StopFlingBtn = Instance.new("TextButton", KillFrame)
+    StopFlingBtn.Size = UDim2.new(1, -16, 0, 32)
+    StopFlingBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+    StopFlingBtn.Text = Localization[currentLanguage].StopFling
+    StopFlingBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    StopFlingBtn.Font = Enum.Font.SourceSansBold
+    StopFlingBtn.ZIndex = 5
+    Instance.new("UICorner", StopFlingBtn).CornerRadius = UDim.new(0, 8)
+
+    StopFlingBtn.Activated:Connect(function() 
+        flingLoopActive = false
+        flingPlrEnabled = false
+        flingAllEnabled = false
+        flingDoorsEnabled = false
+        if updateFlingPlr then updateFlingPlr() end
+        if updateFlingAll then updateFlingAll() end
+        if updateFlingDoors then updateFlingDoors() end
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local KillSeparatorLine6 = Instance.new("Frame", KillFrame)
+    KillSeparatorLine6.Size = UDim2.new(1, -10, 0, 2)
+    KillSeparatorLine6.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    KillSeparatorLine6.ZIndex = 4
+
+    -- АВТО ПОЛУЧЕНИЕ ДИВАНА
+    local autoSofaEnabled = false
+    local autoSofaContainer, _, updateAutoSofa = CreateKillToggle(KillFrame, Localization[currentLanguage].AutoGetSofa, 45, function() return autoSofaEnabled end, function() 
+        autoSofaEnabled = not autoSofaEnabled
+        if autoSofaEnabled then
+            task.spawn(function()
+                while autoSofaEnabled do
+                    local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+                    if bp then
+                        local found = false
+                        for _, tool in ipairs(bp:GetChildren()) do
+                            if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                                found = true
+                                break
+                            end
+                        end
+                        if not found then
+                            -- Ищем диван на карте
+                            for _, obj in ipairs(Workspace:GetDescendants()) do
+                                if obj:IsA("Tool") and (obj.Name:lower():find("sofa") or obj.Name:lower():find("диван")) then
+                                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                                    if hrp then
+                                        hrp.CFrame = obj:GetPivot()
+                                        task.wait(0.1)
+                                        obj.Parent = LocalPlayer.Character
+                                        task.wait(0.1)
+                                        obj.Parent = bp
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(3)
+                end
+            end)
+        end
+    end)
+
+    -- ПОЛУЧИТЬ/УДАЛИТЬ ДИВАН (ОВАЛ)
+    local GetSofaBtn = Instance.new("TextButton", KillFrame)
+    GetSofaBtn.Size = UDim2.new(1, -16, 0, 32)
+    GetSofaBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    GetSofaBtn.Text = Localization[currentLanguage].GetRemoveSofa
+    GetSofaBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    GetSofaBtn.Font = Enum.Font.SourceSansBold
+    GetSofaBtn.ZIndex = 5
+    Instance.new("UICorner", GetSofaBtn).CornerRadius = UDim.new(0, 8)
+
+    GetSofaBtn.Activated:Connect(function()
+        local bp = LocalPlayer:FindFirstChildOfClass("Backpack")
+        local found = false
+        if bp then
+            for _, tool in ipairs(bp:GetChildren()) do
+                if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                    tool.Parent = LocalPlayer.Character
+                    found = true
+                    break
+                end
+            end
+        end
+        if not found then
+            local char = LocalPlayer.Character
+            if char then
+                for _, tool in ipairs(char:GetChildren()) do
+                    if tool:IsA("Tool") and (tool.Name:lower():find("sofa") or tool.Name:lower():find("диван")) then
+                        tool.Parent = bp or game:GetService("ReplicatedStorage")
+                        found = true
+                        break
+                    end
+                end
+            end
+        end
+        if not found then
+            print("Диван не найден!")
+        end
+    end)
+
+    -- ОТСТУП ВНИЗУ
+    local KillFinalSpacer = Instance.new("Frame", KillFrame)
+    KillFinalSpacer.Size = UDim2.new(1, 0, 0, 20)
+    KillFinalSpacer.BackgroundTransparency = 1
+    KillFinalSpacer.ZIndex = 3
+
+    KillFrame.CanvasSize = UDim2.new(0, 0, 0, 700)
+
+    -------------------------------------------------------
+    -- ВКЛАДКА "TELEPORT" (РАСШИРЕННАЯ)
+    -------------------------------------------------------
+    -- ВЫБОР ЛОКАЦИЙ (ОВАЛ СО СТРЕЛКОЙ)
+    local LocBtn = Instance.new("TextButton", TeleportFrame)
+    LocBtn.Size = UDim2.new(1, -16, 0, 32)
+    LocBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    LocBtn.Text = Localization[currentLanguage].SelectLocHolder
+    LocBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    LocBtn.ZIndex = 5
+    Instance.new("UICorner", LocBtn).CornerRadius = UDim.new(0, 8)
+
+    local LocArrow = Instance.new("TextLabel", LocBtn)
+    LocArrow.Size = UDim2.new(0, 12, 0, 12)
+    LocArrow.BackgroundTransparency = 1
+    LocArrow.Text = "▼"
+    LocArrow.TextColor3 = Color3.fromRGB(200, 200, 200)
+    LocArrow.Font = Enum.Font.SourceSansBold
+    LocArrow.TextSize = 10
+    LocArrow.Position = UDim2.new(1, -16, 0.5, -6)
+    LocArrow.ZIndex = 6
+
+    local LocDropdown = Instance.new("ScrollingFrame", TeleportFrame)
+    LocDropdown.Size = UDim2.new(1, -16, 0, 0)
+    LocDropdown.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    LocDropdown.Visible = false
+    LocDropdown.ZIndex = 6
+    LocDropdown.ScrollBarThickness = 3
+    LocDropdown.ClipsDescendants = true
+    Instance.new("UICorner", LocDropdown).CornerRadius = UDim.new(0, 8)
+
+    local selectedLocationCFrame = nil
+    local brookhavenLocations = {
+        {"Spawn", CFrame.new(-13, 17, 15)}, {"Bank", CFrame.new(-34, 16, -91)}, 
+        {"Arcade", CFrame.new(77, 16, -114)}, {"School", CFrame.new(-220, 16, -80)},
+        {"Hospital", CFrame.new(-180, 16, -260)}, {"Police Station", CFrame.new(-40, 16, -40)},
+        {"Grocery Store", CFrame.new(90, 16, -40)}, {"Daycare", CFrame.new(150, 16, -30)},
+        {"Hair Salon", CFrame.new(50, 16, -90)}, {"Fire Station", CFrame.new(-90, 16, -20)},
+        {"Church / Cemetery", CFrame.new(-300, 18, 50)}, {"Auto Shop", CFrame.new(120, 16, -120)},
+        {"Starbrooks Coffee", CFrame.new(20, 16, -80)}, {"Candy Shop", CFrame.new(35, 16, -40)},
+        {"Ice Cream Parlor", CFrame.new(60, 16, -40)}, {"Burger Shop", CFrame.new(105, 16, -80)},
+        {"Library", CFrame.new(-150, 25, -70)}, {"Cinema", CFrame.new(5, 16, -120)},
+        {"Gym", CFrame.new(130, 16, 10)}, {"Post Office", CFrame.new(-10, 16, -160)},
+        {"Apparel / Clothing", CFrame.new(-70, 16, -90)}, {"Hotel", CFrame.new(0, 16, -60)},
+        {"Airport", CFrame.new(-500, 30, -300)}, {"Lake Brookhaven", CFrame.new(400, 12, 300)},
+        {"Farm", CFrame.new(-600, 16, 200)}, {"Park", CFrame.new(0, 15, 100)},
+        {"Pool", CFrame.new(150, 15, 80)}, {"Gas Station", CFrame.new(200, 16, -50)},
+        {"Golf Course", CFrame.new(-400, 15, 500)}, {"Secret Agency", CFrame.new(-75, -15, -60)}
+    }
+
+    for _, loc in ipairs(brookhavenLocations) do
+        local b = Instance.new("TextButton", LocDropdown)
+        b.Size = UDim2.new(1, 0, 0, 28)
+        b.BackgroundTransparency = 1
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Text = "📍 " .. loc[1]
+        b.Font = Enum.Font.SourceSans
+        b.TextSize = 13
+        b.Activated:Connect(function()
+            selectedLocationCFrame = loc[2]
+            LocBtn.Text = "📍 " .. loc[1]
+            LocDropdown.Visible = false
+            LocDropdown.Size = UDim2.new(1, -16, 0, 0)
+        end)
+    end
+
+    LocBtn.Activated:Connect(function()
+        LocDropdown.Visible = not LocDropdown.Visible
+        LocDropdown.Size = LocDropdown.Visible and UDim2.new(1, -16, 0, 120) or UDim2.new(1, -16, 0, 0)
+    end)
+
+    -- ТЕЛЕПОРТ К ЛОКАЦИИ (ОВАЛ НА ВСЮ ШИРИНУ)
+    local MainTpLocBtn = Instance.new("TextButton", TeleportFrame)
+    MainTpLocBtn.Size = UDim2.new(1, -16, 0, 40)
+    MainTpLocBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 120)
+    MainTpLocBtn.Text = Localization[currentLanguage].TeleportToLoc
+    MainTpLocBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MainTpLocBtn.Font = Enum.Font.SourceSansBold
+    MainTpLocBtn.ZIndex = 5
+    Instance.new("UICorner", MainTpLocBtn).CornerRadius = UDim.new(0, 10)
+    MainTpLocBtn.Activated:Connect(function()
+        local r = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if r and selectedLocationCFrame then 
+            r.CFrame = selectedLocationCFrame
+        end
+    end)
+
+    -- ПОЛОСКА РАЗДЕЛЯЮЩАЯ
+    local TpSeparatorLine = Instance.new("Frame", TeleportFrame)
+    TpSeparatorLine.Size = UDim2.new(1, -10, 0, 2)
+    TpSeparatorLine.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    TpSeparatorLine.ZIndex = 4
+
+    -- ВЫБОР ИГРОКА ДЛЯ ТЕЛЕПОРТА (ОВАЛ СО СТРЕЛКОЙ)
+    local SelectTpPlrBtn = Instance.new("TextButton", TeleportFrame)
+    SelectTpPlrBtn.Size = UDim2.new(1, -16, 0, 32)
+    SelectTpPlrBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    SelectTpPlrBtn.Text = Localization[currentLanguage].SelectPlrHolder
+    SelectTpPlrBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    SelectTpPlrBtn.ZIndex = 5
+    Instance.new("UICorner", SelectTpPlrBtn).CornerRadius = UDim.new(0, 8)
+
+    local TpPlrArrow = Instance.new("TextLabel", SelectTpPlrBtn)
+    TpPlrArrow.Size = UDim2.new(0, 12, 0, 12)
+    TpPlrArrow.BackgroundTransparency = 1
+    TpPlrArrow.Text = "▼"
+    TpPlrArrow.TextColor3 = Color3.fromRGB(200, 200, 200)
+    TpPlrArrow.Font = Enum.Font.SourceSansBold
+    TpPlrArrow.TextSize = 10
+    TpPlrArrow.Position = UDim2.new(1, -16, 0.5, -6)
+    TpPlrArrow.ZIndex = 6
+
+    local TpPlrDropdown = Instance.new("ScrollingFrame", TeleportFrame)
+    TpPlrDropdown.Size = UDim2.new(1, -16, 0, 0)
+    TpPlrDropdown.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    TpPlrDropdown.Visible = false
+    TpPlrDropdown.ZIndex = 6
+    TpPlrDropdown.ScrollBarThickness = 2
+    TpPlrDropdown.ClipsDescendants = true
+    Instance.new("UICorner", TpPlrDropdown).CornerRadius = UDim.new(0, 8)
+
+    local function updateTpPlrDropdown()
+        for _, c in ipairs(TpPlrDropdown:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local b = Instance.new("TextButton", TpPlrDropdown)
+                b.Size = UDim2.new(1, 0, 0, 28)
+                b.BackgroundTransparency = 1
+                b.TextColor3 = Color3.fromRGB(255, 255, 255)
+                b.Text = player.Name .. " (" .. player.DisplayName .. ")"
+                b.Font = Enum.Font.SourceSans
+                b.TextSize = 13
+                b.Activated:Connect(function()
+                    selectedTpPlayer = player
+                    SelectTpPlrBtn.Text = "🎯 " .. player.Name
+                    TpPlrDropdown.Visible = false
+                    TpPlrDropdown.Size = UDim2.new(1, -16, 0, 0)
+                end)
+            end
+        end
+        TpPlrDropdown.CanvasSize = UDim2.new(0, 0, 0, #Players:GetPlayers() * 28 + 10)
+    end
+
+    SelectTpPlrBtn.Activated:Connect(function()
+        TpPlrDropdown.Visible = not TpPlrDropdown.Visible
+        if TpPlrDropdown.Visible then
+            updateTpPlrDropdown()
+            TpPlrDropdown.Size = UDim2.new(1, -16, 0, 100)
+        else
+            TpPlrDropdown.Size = UDim2.new(1, -16, 0, 0)
+        end
+    end)
+
+    -- ТЕЛЕПОРТ К ИГРОКУ (ОВАЛ НА ВСЮ ШИРИНУ)
+    local MainTpPlayerBtn = Instance.new("TextButton", TeleportFrame)
+    MainTpPlayerBtn.Size = UDim2.new(1, -16, 0, 40)
+    MainTpPlayerBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    MainTpPlayerBtn.Text = Localization[currentLanguage].TeleportToPlr
+    MainTpPlayerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    MainTpPlayerBtn.Font = Enum.Font.SourceSansBold
+    MainTpPlayerBtn.ZIndex = 5
+    Instance.new("UICorner", MainTpPlayerBtn).CornerRadius = UDim.new(0, 10)
+    MainTpPlayerBtn.Activated:Connect(function()
+        if selectedTpPlayer and selectedTpPlayer.Character and selectedTpPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local r = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if r then
+                r.CFrame = selectedTpPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -2)
+            end
+        end
+    end)
+
+    local TpFinalSpacer = Instance.new("Frame", TeleportFrame)
+    TpFinalSpacer.Size = UDim2.new(1, 0, 0, 30)
+    TpFinalSpacer.BackgroundTransparency = 1
+    TpFinalSpacer.ZIndex = 3
+
+    TeleportFrame.CanvasSize = UDim2.new(0, 0, 0, 350)
+
+    -------------------------------------------------------
+    -- УПРАВЛЕНИЕ ВКЛАДКАМИ
+    -------------------------------------------------------
     local function CheckGameTabs(gameName)
         local isBrookhaven = (gameName == "Brookhaven")
         PlayerButton.Visible = isBrookhaven
@@ -1545,6 +2697,7 @@ local success, err = pcall(function()
         if playerUIElements["FOV"] then playerUIElements["FOV"].Label.Text = data.FOVText playerUIElements["FOV"].Reset.Text = data.ResetBtn end
         
         if playerUIElements["AntiSit"] then playerUIElements["AntiSit"].Label.Text = "  " .. data.AntiSit playerUIElements["AntiSit"].UpdateVisuals() end
+        if playerUIElements["AntiAFK"] then playerUIElements["AntiAFK"].Label.Text = "  " .. data.AntiAFK playerUIElements["AntiAFK"].UpdateVisuals() end
         if playerUIElements["InfJump"] then playerUIElements["InfJump"].Label.Text = "  " .. data.InfJump playerUIElements["InfJump"].UpdateVisuals() end
         if playerUIElements["SwimMode"] then playerUIElements["SwimMode"].Label.Text = "  " .. data.SwimMode playerUIElements["SwimMode"].UpdateVisuals() end
         if playerUIElements["Noclip"] then playerUIElements["Noclip"].Label.Text = "  " .. data.Noclip playerUIElements["Noclip"].UpdateVisuals() end
@@ -1563,25 +2716,68 @@ local success, err = pcall(function()
         GetToolButton.Text = data.GetTool
         TeleportToPlayerBtn.Text = data.TeleportTo
         SpectateLbl.Text = "  " .. data.SpectatePlr
-        FollowLbl.Text = "  " .. data.FollowPlr
+        if followEnabled then
+            FollowLbl.Text = "  " .. data.FollowPlrOn
+        else
+            FollowLbl.Text = "  " .. data.FollowPlr
+        end
         SingleEspLbl.Text = "  " .. data.EspPlr
         AllEspLbl.Text = "  " .. data.EspAll
+
+        KillSelectLeftTitle.Text = data.T_Kill or "Kill"
+        GetKillToolButton.Text = data.GetTool
+        KillMethodBtn.Text = "Метод: " .. selectedKillMethod
         
-        -- Фикс моментального плейсхолдера:
-        SignTextBoxOval.PlaceholderText = data.SignPlaceholder
-        if SignTextBoxOval.Text == "" or SignTextBoxOval.Text == "Текст таблички..." or SignTextBoxOval.Text == "Sign text..." then
-            SignTextBoxOval.Text = ""
+        if not selectedKillPlayer then 
+            KillSelectNickText.Text = data.SelectPlrHolder 
         end
+        
+        SignTextBoxOval.PlaceholderText = data.SignPlaceholder
         
         if not selectedTargetPlayer then
             PlrSelectNickText.Text = data.SelectPlrHolder
         end
         
         WriteSignButton.Text = data.WriteBtn
+        KidnapBtn.Text = data.SofaKidnap
+        FastKillBtn.Text = data.FastKill
+        StopKillsBtn.Text = data.StopKills
+        StopFlingBtn.Text = data.StopFling
+        GetSofaBtn.Text = data.GetRemoveSofa
+        LocBtn.Text = data.SelectLocHolder
+        MainTpLocBtn.Text = data.TeleportToLoc
+        MainTpPlayerBtn.Text = data.TeleportToPlr
+        
+        if not selectedTpPlayer then
+            SelectTpPlrBtn.Text = data.SelectPlrHolder
+        end
 
         for _, tKey in ipairs(bhTabsList) do
             if bhButtons[tKey] then
                 bhButtons[tKey].Text = data["T_" .. tKey] or tKey
+            end
+        end
+
+        -- Обновляем переключатели в Kill
+        local killToggleMap = {
+            ["Auto-Kill Target"] = "AutoKillPlr",
+            ["Auto-Kill All"] = "AutoKillAll",
+            ["Auto-Manual Kill"] = "AutoManualKill",
+            ["Fling Target"] = "FlingPlr",
+            ["Fling All Players"] = "FlingAll",
+            ["Fling Doors"] = "FlingDoors",
+            ["Auto Get Sofa"] = "AutoGetSofa"
+        }
+        for _, child in ipairs(KillFrame:GetChildren()) do
+            if child:IsA("Frame") and child:FindFirstChildOfClass("TextLabel") then
+                local label = child:FindFirstChildOfClass("TextLabel")
+                if label then
+                    local labelText = label.Text:gsub("^  ", "")
+                    local key = killToggleMap[labelText]
+                    if key and data[key] then
+                        label.Text = "  " .. data[key]
+                    end
+                end
             end
         end
 
