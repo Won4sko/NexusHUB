@@ -38,11 +38,8 @@ local success, err = pcall(function()
     local currentLanguage = "Русский"
     local currentTab = "Settings" 
 
-    local DEFAULT_SPEED = 16
-    local DEFAULT_JUMP = 50
     local DEFAULT_GRAVITY = 196.2
     
-    -- Состояния функций
     local antiSitEnabled = false
     local antiAfkEnabled = false
     local infJumpEnabled = false
@@ -86,7 +83,7 @@ local success, err = pcall(function()
             DevsTitle = "المطورين", Settings = "الإعدادات", Support = "الدعم", GameTab = "لعبة",
             WalkSpeed = "سرعة المشي", JumpPower = "قوة القفز", Gravity = "الجاذبية", ResetBtn = "إعادة",
             InvisibleText = "Оلاقتفاء", ToolBtn = "قائمة", AntiSit = "منع الجلوس", AntiAFK = "ضд الأفلاق",
-            InfJump = "قفز لا نهائي", SwimMode = "وضع السباحة", Noclip = "اختراق الجدران", GravZero = "جاذبية الفضاء", 
+            InfJump = "قفз لا نهائي", SwimMode = "وضع السباحة", Noclip = "اختراق الجدران", GravZero = "جاذبية الفضاء", 
             ShiftLock = "قفل التحويل", AutoUnban = "إلغاء الحظر التلقائي", SitBtn = "جلوس", FlyBtn = "طيران", 
             SitAction = "اضغط للجلوس", FOVText = "مجال الرؤية",
             DevsText = "Won4sko :التصميم\n\nWon4sko :البرمجة\n\nWon4sko, Gemini, DeepSeek. :الميزات",
@@ -104,20 +101,6 @@ local success, err = pcall(function()
             NothingHere = "No hay nada aquí..", SelectGameText = "Selecciona un juego..."
         }
     }
-
-    -------------------------------------------------------
-    -- УПРАВЛЕНИЕ НЕВИДИМОСТЬЮ И ЦИКЛАМИ
-    -------------------------------------------------------
-    local function UpdateCharacterTransparency(char, value)
-        if not char then return end
-        for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("BasePart") or obj:IsA("Decal") then
-                if obj.Name ~= "HumanoidRootPart" then
-                    obj.Transparency = value
-                end
-            end
-        end
-    end
 
     pcall(function()
         LocalPlayer.Idled:Connect(function()
@@ -331,7 +314,6 @@ local success, err = pcall(function()
         return Btn
     end
 
-    -- ВКЛАДКИ НА ЛЕВОЙ ПАНЕЛИ
     local SettingsButton = CreateMenuTabButton("Settings", 1)
     local SupportButton = CreateMenuTabButton("Support", 2)
     local GameButton = CreateMenuTabButton("Game", 3)
@@ -339,8 +321,6 @@ local success, err = pcall(function()
     SettingsButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     SettingsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    -- ЦЕНТРАЛЬНЫЕ ОКНА СКРОЛЛА
-    local CentralFrames = {}
     local function CreateCentralScroll(name)
         local Scf = Instance.new("ScrollingFrame", MainFrame)
         Scf.Name = name .. "Scroll"
@@ -352,7 +332,6 @@ local success, err = pcall(function()
         Scf.Visible = false
         Scf.ZIndex = 2
         Instance.new("UICorner", Scf).CornerRadius = UDim.new(0, 8)
-        CentralFrames[name] = Scf
         return Scf
     end
 
@@ -362,10 +341,15 @@ local success, err = pcall(function()
     local GameFrame = CreateCentralScroll("Game")
 
     local DevelopersBlock = Instance.new("Frame", GreyFrame) 
+    DevelopersBlock.Name = "DevelopersBlock"
+    DevelopersBlock.Size = UDim2.new(1, 0, 0, 145) 
+    DevelopersBlock.BackgroundTransparency = 1
+    DevelopersBlock.ZIndex = 3
 
-    -------------------------------------------------------
-    -- НАСТРОЙКА ВКЛАДКИ ПОДДЕРЖКА (SupportFrame)
-    -------------------------------------------------------
+    local DevsLabel = Instance.new("TextLabel", DevelopersBlock)
+    local DevsOval = Instance.new("Frame", DevelopersBlock)
+    local DevsText = Instance.new("TextLabel", DevsOval)
+
     local SupportTextLabel = Instance.new("TextLabel", SupportFrame)
     SupportTextLabel.Size = UDim2.new(1, 0, 1, 0)
     SupportTextLabel.BackgroundTransparency = 1
@@ -375,9 +359,6 @@ local success, err = pcall(function()
     SupportTextLabel.TextAlignment = Enum.TextAlignment.Center
     SupportTextLabel.ZIndex = 3
 
-    -------------------------------------------------------
-    -- НАСТРОЙКА ВКЛАДКИ ИГРА (GameFrame)
-    -------------------------------------------------------
     local GameCenterBlock = Instance.new("Frame", GameFrame)
     GameCenterBlock.Size = UDim2.new(1, -20, 0, 100)
     GameCenterBlock.Position = UDim2.new(0, 10, 0.5, -50)
@@ -405,9 +386,6 @@ local success, err = pcall(function()
     GameSelectLabel.TextSize = 14
     GameSelectLabel.ZIndex = 4
 
-    -------------------------------------------------------
-    -- НАСТРОЙКА ВКЛАДКИ НАСТРОЕК (GreyFrame)
-    -------------------------------------------------------
     local LanguageLabel = Instance.new("TextLabel", GreyFrame)
     LanguageLabel.Size = UDim2.new(1, 0, 0, 22)
     LanguageLabel.Position = UDim2.new(0, 0, 0, 10)
@@ -465,6 +443,7 @@ local success, err = pcall(function()
     SeparatorLine2Left.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     SeparatorLine2Left.Size = UDim2.new(0.5, -45, 0, 2)
     SeparatorLine2Left.ZIndex = 3
+
     local SeparatorLine2Right = Instance.new("Frame", GreyFrame)
     SeparatorLine2Right.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     SeparatorLine2Right.Size = UDim2.new(0.5, -45, 0, 2)
@@ -569,9 +548,6 @@ local success, err = pcall(function()
 
     UpdateGeometry()
 
-    -------------------------------------------------------
-    -- УПРАВЛЕНИЕ ВКЛАДКАМИ (КЛИКИ)
-    -------------------------------------------------------
     local allTabs = {
         ["Settings"] = {Btn = SettingsButton, Frame = GreyFrame},
         ["Support"] = {Btn = SupportButton, Frame = SupportFrame},
@@ -592,33 +568,34 @@ local success, err = pcall(function()
         end)
     end
 
-    -------------------------------------------------------
-    -- АВТО-ОТСТУПЫ СЕКЦИИ НАСТРОЕК
-    -------------------------------------------------------
-    local DevsLabel = Instance.new("TextLabel", DevelopersBlock)
-    local DevsOval = Instance.new("Frame", DevelopersBlock)
-    local DevsText = Instance.new("TextLabel", DevsOval)
-
+    -- Переписанная логика LayoutUI с гарантированно жесткими и точными позициями
     local function LayoutUI(animate)
         local langOpen = DropdownContainer1.Visible
         local tTime = animate and 0.25 or 0
         local tInfo = TweenInfo.new(tTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
+        -- Размер контейнера языков
         TweenService:Create(DropdownContainer1, tInfo, {Size = UDim2.new(1, -16, 0, langOpen and 115 or 0)}):Play()
 
-        local interfaceY = langOpen and 205 or 90
-        TweenService:Create(SeparatorLine2Left, tInfo, {Position = UDim2.new(0, 0, 0, interfaceY + 10)}):Play()
-        TweenService:Create(SeparatorLine2Right, tInfo, {Position = UDim2.new(0.5, 45, 0, interfaceY + 10)}):Play()
-        TweenService:Create(GeometryLabel, tInfo, {Position = UDim2.new(0.5, -45, 0, interfaceY)}):Play()
+        -- Позиция следующего блока ("Интерфейс") зависит исключительно от того, открыт ли список
+        local interfaceY = langOpen and 205 or 85
         
-        TweenService:Create(sliders[1].Container, tInfo, {Position = UDim2.new(0, 6, 0, interfaceY + 26)}):Play()
-        TweenService:Create(sliders[2].Container, tInfo, {Position = UDim2.new(0, 6, 0, interfaceY + 56)}):Play()
-        TweenService:Create(sliders[3].Container, tInfo, {Position = UDim2.new(0, 6, 0, interfaceY + 86)}):Play()
+        -- Перемещаем заголовки и разделительные полосы
+        SeparatorLine2Left.Position = UDim2.new(0, 0, 0, interfaceY + 10)
+        SeparatorLine2Right.Position = UDim2.new(0.5, 45, 0, interfaceY + 10)
+        GeometryLabel.Position = UDim2.new(0.5, -45, 0, interfaceY)
         
-        local devsY = interfaceY + 120
-        TweenService:Create(DevelopersBlock, tInfo, {Position = UDim2.new(0, 0, 0, devsY)}):Play()
+        -- Позиционируем слайдеры под заголовком
+        sliders[1].Container.Position = UDim2.new(0, 6, 0, interfaceY + 30)
+        sliders[2].Container.Position = UDim2.new(0, 6, 0, interfaceY + 60)
+        sliders[3].Container.Position = UDim2.new(0, 6, 0, interfaceY + 90)
         
-        GreyFrame.CanvasSize = UDim2.new(0, 0, 0, devsY + 150)
+        -- Блок создателей сдвигается еще ниже
+        local devsY = interfaceY + 130
+        DevelopersBlock.Position = UDim2.new(0, 0, 0, devsY)
+        
+        -- Растягиваем скролл под финальный размер
+        GreyFrame.CanvasSize = UDim2.new(0, 0, 0, devsY + 160)
     end
 
     local function UpdateLocalization()
@@ -675,11 +652,6 @@ local success, err = pcall(function()
         end)
     end
 
-    DevelopersBlock.Name = "DevelopersBlock"
-    DevelopersBlock.Size = UDim2.new(1, 0, 0, 145) 
-    DevelopersBlock.BackgroundTransparency = 1
-    DevelopersBlock.ZIndex = 3
-
     local SeparatorLine4Left = Instance.new("Frame", DevelopersBlock)
     SeparatorLine4Left.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     SeparatorLine4Left.Size = UDim2.new(0.5, -55, 0, 2)
@@ -710,7 +682,6 @@ local success, err = pcall(function()
     DevsText.TextSize = 12
     DevsText.ZIndex = 5
 
-    -- КНОПКИ ЗАКРЫТИЯ И СВОРЫВАНИЯ
     CloseBtn.Activated:Connect(function() ScreenGui:Destroy() end)
     
     MinimizeBtn.Activated:Connect(function()
@@ -747,4 +718,4 @@ local success, err = pcall(function()
     LayoutUI(false)
 
 end)
-if not success then warn("NexusUI Error: " .. tostring(err)) end
+if not success then warn("NexusUI Critical Error: " .. tostring(err)) end
